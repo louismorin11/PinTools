@@ -69,7 +69,7 @@ VOID Fini(INT32 code, VOID* v)
 {
 	LOG("Fini\n");
 	// Write to a file since cout and cerr maybe closed by the application
-	//addr_map.erase(addr_map.find(0));
+	addr_map.erase(addr_map.find(0));
 	fprintf(out_file, "digraph controlflow {\n");
 	for (map<ADDRINT, set<ADDRINT>>::iterator it_map = addr_map.begin(); it_map != addr_map.end(); ++it_map)
 	{
