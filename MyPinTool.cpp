@@ -25,13 +25,14 @@ using std::set;
 using std::pair;
 using std::endl;
 
-FILE* out_file;
+FILE* out_file = NULL;
 
 // The running count of instructions is kept here
 // make it static to help the compiler optimize docount
 static UINT64 icount = 0;
 static ADDRINT prev_addr = 0;
 static map<ADDRINT, set<ADDRINT>> addr_map;
+static int threadcount = 0;
 
 // This function is called before every instruction is executed
 // It tracks the IP flow
@@ -68,27 +69,41 @@ KNOB<string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool",
 VOID Fini(INT32 code, VOID* v)
 {
 	LOG("Fini\n");
-	// Write to a file since cout and cerr maybe closed by the application
-	addr_map.erase(addr_map.find(0));
-	fprintf(out_file, "digraph controlflow {\n");
-	for (map<ADDRINT, set<ADDRINT>>::iterator it_map = addr_map.begin(); it_map != addr_map.end(); ++it_map)
+	if (out_file != NULL)
 	{
-		for (set<ADDRINT>::iterator it_set = it_map->second.begin(); it_set != it_map->second.end(); ++it_set)
+		// Write to a file since cout and cerr maybe closed by the application
+		addr_map.erase(addr_map.find(0));
+		fprintf(out_file, "digraph controlflow {\n");
+		for (map<ADDRINT, set<ADDRINT>>::iterator it_map = addr_map.begin(); it_map != addr_map.end(); ++it_map)
 		{
-			fprintf(out_file, "\t\"%p\" -> \"%p\";\n", (void*)it_map->first, (void*)*it_set);
+			for (set<ADDRINT>::iterator it_set = it_map->second.begin(); it_set != it_map->second.end(); ++it_set)
+			{
+				fprintf(out_file, "\t\"%p\" -> \"%p\";\n", (void*)it_map->first, (void*)*it_set);
+			}
 		}
+		fprintf(out_file, "}\n");
+		fclose(out_file);
+		out_file = NULL;
 	}
-	fprintf(out_file, "}\n");
-	fclose(out_file);
+}
+
+VOID ThreadStart(THREADID threadIndex, CONTEXT* ctxt, INT32 flags, VOID* v)
+{
+	threadcount++;
+	std::stringstream ss;
+	ss << "ThreadStart id:" << threadIndex << " -- " << PIN_ThreadId() << " -- " << threadcount << endl;
+	string str = ss.str();
+	LOG(str);
 }
 
 VOID ThreadFini(THREADID threadIndex, const CONTEXT* ctxt, INT32 code, VOID* v)
 {
+	threadcount--;
 	std::stringstream ss;
-	ss << "ThreadFini id:" << threadIndex << " -- " << PIN_IsApplicationThread() << " -- " << PIN_ThreadId() << endl;
+	ss << "ThreadFini id:" << threadIndex << " -- " << PIN_ThreadId() << " -- " << threadcount << endl;
 	string str = ss.str();
 	LOG(str);
-	if (threadIndex == PIN_ThreadId())
+	if (threadcount == 0)
 	{
 		Fini(code, v);
 	}
@@ -122,11 +137,14 @@ int main(int argc, char* argv[])
 	// Register Instruction to be called to instrument instructions
 	INS_AddInstrumentFunction(Instruction, 0);
 
-	// Register Fini to be called when the application exits
-	//PIN_AddFiniFunction(Fini, 0);
+	// Follow Thread starts
+	PIN_AddThreadStartFunction(ThreadStart, 0);
 
 	// Handle abrubt closings
 	PIN_AddThreadFiniFunction(ThreadFini, 0);
+
+	// Register Fini to be called when the application exits
+	PIN_AddFiniFunction(Fini, 0);
 
 	// Start the program, never returns
 	PIN_StartProgram();
