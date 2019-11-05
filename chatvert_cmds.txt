@@ -1,0 +1,21 @@
+Everything is run from Desktop
+Create file basic.txt on Desktop with content "simple"
+
+#######################
+
+list /p
+list /s
+list /d
+whoami
+v
+kill /s Spooler
+start /s Spooler
+start /p calc.exe
+pidrun <pidofgreencat> calc.exe
+kill /p <pidofcalc>
+geturl http:\\website.com savehere.png
+getf C:\Users\eceadmin\Desktop\basic.txt 6 . test
+putf C:\Users\eceadmin\Desktop\basic.txt 6 . test
+shell
+dir
+quit
